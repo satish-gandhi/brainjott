@@ -23,10 +23,10 @@ struct QuickPadView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                // Clear the physical notch / menu bar that overlaps the flush top edge.
-                .padding(.top, presenter.notchSize.height + 6)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 6)
+                // Sit the controls at menu-bar level, vertically centered in the top strip.
+                .frame(height: max(presenter.notchSize.height, 24))
+                .padding(.top, 1)
+                .padding(.horizontal, 18)
 
             TextEditor(text: $draft)
                 .font(.system(size: 15))
@@ -34,7 +34,8 @@ struct QuickPadView: View {
                 .tint(.white)
                 .scrollContentBackground(.hidden)
                 .focused($isEditorFocused)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 18)
+                .padding(.top, 6)
                 .padding(.bottom, 18)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

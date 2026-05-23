@@ -90,7 +90,7 @@ final class QuickPadWindowController {
         let notch = QuickPadWindowController.notchMetrics(for: screen)
         presenter.notchSize = notch.size
 
-        let width: CGFloat = 380
+        let width: CGFloat = 560
         let contentHeight: CGFloat = 300
         let height = contentHeight + notch.size.height
         // Flush against the very top edge so the card grows out of the notch.
