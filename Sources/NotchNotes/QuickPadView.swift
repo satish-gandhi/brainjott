@@ -20,6 +20,16 @@ struct QuickPadView: View {
 
     private var bottomCornerRadius: CGFloat { 26 }
 
+    private var panelShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: bottomCornerRadius,
+            bottomTrailingRadius: bottomCornerRadius,
+            topTrailingRadius: 0,
+            style: .continuous
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -38,26 +48,12 @@ struct QuickPadView: View {
                 .padding(.top, 6)
                 .padding(.bottom, 18)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: bottomCornerRadius,
-                bottomTrailingRadius: bottomCornerRadius,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-            .fill(Color(white: 0.05))
-        }
+        .frame(width: presenter.boxSize.width, height: presenter.boxSize.height, alignment: .top)
+        .background(Color(white: 0.05))
+        .clipShape(panelShape)
         .overlay {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: bottomCornerRadius,
-                bottomTrailingRadius: bottomCornerRadius,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-            .stroke(.white.opacity(0.08), lineWidth: 1)
+            panelShape
+                .stroke(.white.opacity(0.08), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
         .scaleEffect(presenter.isExpanded ? 1 : 0.2, anchor: .top)

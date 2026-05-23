@@ -90,13 +90,21 @@ final class QuickPadWindowController {
         let notch = QuickPadWindowController.notchMetrics(for: screen)
         presenter.notchSize = notch.size
 
-        let width: CGFloat = 560
-        let contentHeight: CGFloat = 300
-        let height = contentHeight + notch.size.height
-        // Flush against the very top edge so the card grows out of the notch.
+        // The visible black box.
+        let boxWidth: CGFloat = 560
+        let boxHeight: CGFloat = 300
+        presenter.boxSize = CGSize(width: boxWidth, height: boxHeight)
+
+        // The window is larger than the box so the drop shadow can fade out
+        // without being clipped to a square at the window's edges. No top margin
+        // keeps the box flush against the screen edge / notch.
+        let sideMargin: CGFloat = 44
+        let bottomMargin: CGFloat = 44
+        let width = boxWidth + sideMargin * 2
+        let height = boxHeight + bottomMargin
         let x = notch.centerX - width / 2
         let y = frame.maxY - height
-        print("Notch Notes: positioning quick pad at x=\(Int(x)) y=\(Int(y)) w=\(Int(width)) h=\(Int(height)) notch=\(Int(notch.size.width))x\(Int(notch.size.height)).")
+        print("Notch Notes: positioning quick pad at x=\(Int(x)) y=\(Int(y)) w=\(Int(width)) h=\(Int(height)) box=\(Int(boxWidth))x\(Int(boxHeight)) notch=\(Int(notch.size.width))x\(Int(notch.size.height)).")
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
     }
 
@@ -125,6 +133,7 @@ final class QuickPadWindowController {
 final class PanelPresenter: ObservableObject {
     @Published var isExpanded = false
     @Published var notchSize = CGSize(width: 200, height: 32)
+    @Published var boxSize = CGSize(width: 560, height: 300)
 
     static let transition: Animation = .spring(response: 0.4, dampingFraction: 0.78)
     static let dismissDelay: TimeInterval = 0.32
@@ -148,7 +157,7 @@ final class QuickPadPanel: NSPanel {
         isMovableByWindowBackground = true
         backgroundColor = .clear
         isOpaque = false
-        hasShadow = true
+        hasShadow = false
         isMovableByWindowBackground = false
     }
 
