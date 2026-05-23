@@ -28,4 +28,17 @@ package enum HashtagExtractor {
 
         return orderedTags
     }
+
+    /// Full ranges of each hashtag occurrence (including the leading `#`),
+    /// in order, for syntax highlighting.
+    package static func hashtagRanges(in text: String) -> [NSRange] {
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        var ranges: [NSRange] = []
+        expression.enumerateMatches(in: text, range: range) { match, _, _ in
+            if let match {
+                ranges.append(match.range)
+            }
+        }
+        return ranges
+    }
 }

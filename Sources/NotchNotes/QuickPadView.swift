@@ -16,7 +16,7 @@ struct QuickPadView: View {
     let onCancel: () -> Void
     @ObservedObject var focusToken: FocusToken
     @ObservedObject var presenter: PanelPresenter
-    @FocusState private var isEditorFocused: Bool
+    @State private var previewImage: PastedImage?
 
     private var bottomCornerRadius: CGFloat { 26 }
 
@@ -32,24 +32,37 @@ struct QuickPadView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-                // Sit the controls at menu-bar level, vertically centered in the top strip.
-                .frame(height: max(presenter.notchSize.height, 24))
-                .padding(.top, 1)
-                .padding(.horizontal, 18)
+            HashtagTextEditor(
+                text: $draft,
+                focusTrigger: focusToken.value,
+                onPasteImage: { data in
+                    presenter.draftImages.append(PastedImage(data: data))
+                }
+            )
+            .padding(.horizontal, 18)
+            // Clear the system menu-bar strip that overlaps the flush top edge.
+            .padding(.top, presenter.notchSize.height + 8)
+            .padding(.bottom, 8)
 
-            TextEditor(text: $draft)
-                .font(.system(size: 15))
-                .foregroundStyle(.white)
-                .tint(.white)
-                .scrollContentBackground(.hidden)
-                .focused($isEditorFocused)
+            if !presenter.draftImages.isEmpty {
+                thumbnailStrip
+                    .padding(.bottom, 8)
+            }
+
+            controlBar
+                .frame(height: 30)
                 .padding(.horizontal, 18)
-                .padding(.top, 6)
-                .padding(.bottom, 18)
+                .padding(.bottom, 14)
         }
         .frame(width: presenter.boxSize.width, height: presenter.boxSize.height, alignment: .top)
         .background(Color(white: 0.05))
+        .overlay {
+            if let previewImage {
+                ImagePreviewOverlay(data: previewImage.data) {
+                    self.previewImage = nil
+                }
+            }
+        }
         .clipShape(panelShape)
         .overlay {
             panelShape
@@ -62,15 +75,9 @@ struct QuickPadView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.clear)
         .ignoresSafeArea(.all)
-        .onAppear {
-            isEditorFocused = true
-        }
-        .onChange(of: focusToken.value) {
-            isEditorFocused = true
-        }
     }
 
-    private var header: some View {
+    private var controlBar: some View {
         HStack(spacing: 8) {
             Button(action: onCancel) {
                 Image(systemName: "xmark")
@@ -110,17 +117,68 @@ struct QuickPadView: View {
         }
     }
 
+    private var thumbnailStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(presenter.draftImages) { item in
+                    if let nsImage = NSImage(data: item.data) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 56, height: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .onTapGesture {
+                                previewImage = item
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(.white.opacity(0.15), lineWidth: 1)
+                            }
+                            .overlay(alignment: .topTrailing) {
+                                Button {
+                                    presenter.draftImages.removeAll { $0.id == item.id }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white, .black.opacity(0.55))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(2)
+                            }
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+        }
+        .frame(height: 60)
+    }
+
     private func pasteClipboard() {
-        guard let text = NSPasteboard.general.string(forType: .string),
-              !text.isEmpty else {
-            return
+        let pasteboard = NSPasteboard.general
+
+        if let pastedImages = pasteboard.readObjects(forClasses: [NSImage.self]) as? [NSImage] {
+            for image in pastedImages {
+                if let data = QuickPadView.pngData(from: image) {
+                    presenter.draftImages.append(PastedImage(data: data))
+                }
+            }
         }
 
-        if draft.isEmpty {
-            draft = text
-        } else {
-            draft += "\n" + text
+        if let text = pasteboard.string(forType: .string), !text.isEmpty {
+            if draft.isEmpty {
+                draft = text
+            } else {
+                draft += "\n" + text
+            }
         }
-        isEditorFocused = true
+    }
+
+    private static func pngData(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else {
+            return nil
+        }
+        return rep.representation(using: .png, properties: [:])
     }
 }

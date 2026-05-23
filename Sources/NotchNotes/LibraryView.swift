@@ -1,3 +1,4 @@
+import AppKit
 import SwiftData
 import SwiftUI
 
@@ -107,6 +108,15 @@ private struct NoteRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+
+            if !note.imageDatas.isEmpty {
+                Label(
+                    "^[\(note.imageDatas.count) image](inflect: true)",
+                    systemImage: "photo"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -114,6 +124,7 @@ private struct NoteRow: View {
 
 private struct NoteEditorView: View {
     @Bindable var note: Note
+    @State private var previewData: Data?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -146,8 +157,41 @@ private struct NoteEditorView: View {
             )
             .font(.system(size: 16))
             .scrollContentBackground(.hidden)
+
+            if !note.imageDatas.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Array(note.imageDatas.enumerated()), id: \.offset) { _, data in
+                            if let image = NSImage(data: data) {
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxHeight: 180)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .stroke(.primary.opacity(0.1), lineWidth: 1)
+                                    }
+                                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .onTapGesture {
+                                        previewData = data
+                                    }
+                            }
+                        }
+                    }
+                }
+                .frame(height: 188)
+            }
         }
         .padding(20)
         .navigationTitle("Editor")
+        .overlay {
+            if let previewData {
+                ImagePreviewOverlay(data: previewData) {
+                    self.previewData = nil
+                }
+                .ignoresSafeArea()
+            }
+        }
     }
 }

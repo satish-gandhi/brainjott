@@ -70,14 +70,16 @@ final class QuickPadWindowController {
 
     private func saveDraft() {
         let trimmedBody = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedBody.isEmpty else {
+        let imageDatas = presenter.draftImages.map(\.data)
+        guard !trimmedBody.isEmpty || !imageDatas.isEmpty else {
             hide()
             return
         }
 
-        modelContainer.mainContext.insert(Note(body: trimmedBody))
+        modelContainer.mainContext.insert(Note(body: trimmedBody, imageDatas: imageDatas))
         try? modelContainer.mainContext.save()
         draft = ""
+        presenter.draftImages = []
         hide()
     }
 
@@ -129,11 +131,19 @@ final class QuickPadWindowController {
     }
 }
 
+/// A pasted image held while drafting, with a stable identity so the thumbnail
+/// strip can add/remove by id rather than by array index.
+struct PastedImage: Identifiable, Hashable {
+    let id = UUID()
+    let data: Data
+}
+
 @MainActor
 final class PanelPresenter: ObservableObject {
     @Published var isExpanded = false
     @Published var notchSize = CGSize(width: 200, height: 32)
     @Published var boxSize = CGSize(width: 560, height: 300)
+    @Published var draftImages: [PastedImage] = []
 
     static let transition: Animation = .spring(response: 0.4, dampingFraction: 0.78)
     static let dismissDelay: TimeInterval = 0.32

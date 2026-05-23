@@ -7,9 +7,11 @@ final class Note {
     var createdAt: Date
     var updatedAt: Date
     var tags: [String]
+    @Attribute(.externalStorage) var imageDatas: [Data] = []
 
-    init(body: String, createdAt: Date = .now, updatedAt: Date = .now) {
+    init(body: String, imageDatas: [Data] = [], createdAt: Date = .now, updatedAt: Date = .now) {
         self.body = body
+        self.imageDatas = imageDatas
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.tags = HashtagExtractor.tags(in: body)
