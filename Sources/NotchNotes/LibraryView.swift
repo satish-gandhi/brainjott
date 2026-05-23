@@ -6,30 +6,45 @@ struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
     @State private var selectedNote: Note?
-    @State private var selectedTag: String?
+    @State private var selectedFilter: TagFilter = .all
+
+    private enum TagFilter: Hashable {
+        case all
+        case tag(String)
+    }
 
     private var allTags: [String] {
         Array(Set(notes.flatMap(\.tags))).sorted()
     }
 
     private var filteredNotes: [Note] {
-        guard let selectedTag else {
+        switch selectedFilter {
+        case .all:
             return notes
+        case .tag(let tag):
+            return notes.filter { $0.tags.contains(tag) }
         }
+    }
 
-        return notes.filter { $0.tags.contains(selectedTag) }
+    private var navigationTitleText: String {
+        switch selectedFilter {
+        case .all:
+            return "Notes"
+        case .tag(let tag):
+            return "#\(tag)"
+        }
     }
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selectedTag) {
+            List(selection: $selectedFilter) {
                 Section("Tags") {
-                    Text("All Notes")
-                        .tag(String?.none)
+                    Label("All Notes", systemImage: "tray.full")
+                        .tag(TagFilter.all)
 
                     ForEach(allTags, id: \.self) { tag in
                         Label("#\(tag)", systemImage: "number")
-                            .tag(String?.some(tag))
+                            .tag(TagFilter.tag(tag))
                     }
                 }
             }
@@ -48,7 +63,7 @@ struct LibraryView: View {
                     )
                 }
             }
-            .navigationTitle(selectedTag.map { "#\($0)" } ?? "Notes")
+            .navigationTitle(navigationTitleText)
             .toolbar {
                 ToolbarItem {
                     Button {
@@ -98,7 +113,7 @@ private struct NoteRow: View {
                 .font(.headline)
                 .lineLimit(1)
 
-            Text(note.updatedAt, style: .relative)
+            Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -129,9 +144,7 @@ private struct NoteEditorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(note.updatedAt, style: .date)
-                    .foregroundStyle(.secondary)
-                Text(note.updatedAt, style: .time)
+                Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
                     .foregroundStyle(.secondary)
                 Spacer()
             }
