@@ -4,7 +4,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Quick Capture") {
-                LabeledContent("Global Shortcut", value: "Option-N")
+                LabeledContent("Global Shortcut", value: "Option-Space")
                 Text("Shortcut remapping can be added after the first version.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

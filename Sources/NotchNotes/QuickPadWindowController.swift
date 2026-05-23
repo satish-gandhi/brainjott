@@ -23,7 +23,10 @@ final class QuickPadWindowController {
             onSave: { [weak self] in self?.saveDraft() },
             onCancel: { [weak self] in self?.hide() },
             focusToken: focusToken,
-            presenter: presenter
+            presenter: presenter,
+            tagSuggestions: { [weak self] query in
+                self?.tagSuggestions(matching: query) ?? []
+            }
         )
 
         let hostingView = NSHostingView(rootView: content)
@@ -66,6 +69,28 @@ final class QuickPadWindowController {
         }
         dismissWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + PanelPresenter.dismissDelay, execute: work)
+    }
+
+    /// Existing tags ranked by recent use, prefix-matched against `query`.
+    private func tagSuggestions(matching query: String) -> [String] {
+        let descriptor = FetchDescriptor<Note>(
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        let notes = (try? modelContainer.mainContext.fetch(descriptor)) ?? []
+
+        var ordered: [String] = []
+        var seen = Set<String>()
+        for note in notes {
+            for tag in note.tags where seen.insert(tag).inserted {
+                ordered.append(tag)
+            }
+        }
+
+        let needle = query.lowercased()
+        let matches = needle.isEmpty
+            ? ordered
+            : ordered.filter { $0.hasPrefix(needle) && $0 != needle }
+        return Array(matches.prefix(8))
     }
 
     private func saveDraft() {

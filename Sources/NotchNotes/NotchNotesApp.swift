@@ -37,7 +37,7 @@ struct NotchNotesApp: App {
             Button("Open Quick Note") {
                 appController.toggleQuickPad()
             }
-            .keyboardShortcut("n", modifiers: [.option])
+            .keyboardShortcut(.space, modifiers: [.option])
 
             Button("Open Library") {
                 openWindow(id: "library")

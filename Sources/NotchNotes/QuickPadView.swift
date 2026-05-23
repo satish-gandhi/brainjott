@@ -16,7 +16,9 @@ struct QuickPadView: View {
     let onCancel: () -> Void
     @ObservedObject var focusToken: FocusToken
     @ObservedObject var presenter: PanelPresenter
+    let tagSuggestions: (String) -> [String]
     @State private var previewImage: PastedImage?
+    @StateObject private var suggestionModel = TagSuggestionModel()
 
     private var bottomCornerRadius: CGFloat { 26 }
 
@@ -37,12 +39,19 @@ struct QuickPadView: View {
                 focusTrigger: focusToken.value,
                 onPasteImage: { data in
                     presenter.draftImages.append(PastedImage(data: data))
-                }
+                },
+                suggestionsProvider: tagSuggestions,
+                suggestionModel: suggestionModel
             )
             .padding(.horizontal, 18)
             // Clear the system menu-bar strip that overlaps the flush top edge.
             .padding(.top, presenter.notchSize.height + 8)
             .padding(.bottom, 8)
+
+            if !suggestionModel.items.isEmpty {
+                suggestionBar
+                    .padding(.bottom, 8)
+            }
 
             if !presenter.draftImages.isEmpty {
                 thumbnailStrip
@@ -115,6 +124,38 @@ struct QuickPadView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.return, modifiers: [.command])
         }
+    }
+
+    private var suggestionBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(Array(suggestionModel.items.enumerated()), id: \.element) { index, tag in
+                    Button {
+                        suggestionModel.accept(tag)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("#\(tag)")
+                                .font(.system(size: 12, weight: .medium))
+                            if index == 0 {
+                                Text("⇥")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .opacity(0.6)
+                            }
+                        }
+                        .foregroundStyle(Color(nsColor: HashtagTextEditor.accent))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.08), in: Capsule())
+                        .overlay {
+                            Capsule().stroke(Color(nsColor: HashtagTextEditor.accent).opacity(0.3), lineWidth: 1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 18)
+        }
+        .frame(height: 28)
     }
 
     private var thumbnailStrip: some View {

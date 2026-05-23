@@ -45,7 +45,7 @@ final class GlobalHotKey: @unchecked Sendable {
     private func registerShortcut() {
         let hotKeyID = EventHotKeyID(signature: Self.signature("NTCH"), id: 1)
         let status = RegisterEventHotKey(
-            UInt32(kVK_ANSI_N),
+            UInt32(kVK_Space),
             UInt32(optionKey),
             hotKeyID,
             GetApplicationEventTarget(),
@@ -54,9 +54,9 @@ final class GlobalHotKey: @unchecked Sendable {
         )
 
         if status == noErr {
-            print("Notch Notes: registered Option-N global shortcut.")
+            print("Notch Notes: registered Option-Space global shortcut.")
         } else {
-            print("Notch Notes: failed to register Option-N global shortcut (\(status)).")
+            print("Notch Notes: failed to register Option-Space global shortcut (\(status)).")
         }
     }
 

@@ -17,7 +17,7 @@ open dist/NotchNotes.app
 
 ## Use
 
-- Press `Option-N` to toggle the floating quick pad near the top-center of the screen.
+- Press `Option-Space` to toggle the floating quick pad near the top-center of the screen.
 - Type a note and press `Command-Return` to save it.
 - Press `Escape` to hide the quick pad without losing the current draft.
 - Add tags directly in note text with hashtags like `#work`, `#Project-1`, or `#todo_item`.

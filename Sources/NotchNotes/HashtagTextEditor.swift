@@ -1,13 +1,26 @@
 import AppKit
 import SwiftUI
 
+/// Drives the inline tag-suggestion chip bar shown while typing a `#hashtag`.
+@MainActor
+final class TagSuggestionModel: ObservableObject {
+    @Published var items: [String] = []
+    var onAccept: (String) -> Void = { _ in }
+
+    func accept(_ tag: String) {
+        onAccept(tag)
+    }
+}
+
 /// A plain-text editor backed by NSTextView that renders body text in white,
-/// highlights `#hashtags` with a cyan glow, and draws a cyan glowing caret.
-/// Image pastes are routed to `onPasteImage` instead of being inserted as text.
+/// highlights `#hashtags` with a cyan glow, draws a cyan glowing caret, routes
+/// image pastes to `onPasteImage`, and surfaces tag suggestions while typing.
 struct HashtagTextEditor: NSViewRepresentable {
     @Binding var text: String
     var focusTrigger: Int
     var onPasteImage: (Data) -> Void
+    var suggestionsProvider: (String) -> [String]
+    var suggestionModel: TagSuggestionModel
 
     static let accent = NSColor(red: 0.20, green: 0.92, blue: 1.0, alpha: 1.0)
     static let bodyColor = NSColor.white
@@ -40,9 +53,17 @@ struct HashtagTextEditor: NSViewRepresentable {
         scrollView.hasVerticalScroller = true
         scrollView.documentView = textView
 
-        context.coordinator.textView = textView
+        let coordinator = context.coordinator
+        coordinator.textView = textView
+        textView.onTabComplete = { [weak coordinator] in
+            coordinator?.acceptFirstSuggestion() ?? false
+        }
+        suggestionModel.onAccept = { [weak coordinator] tag in
+            coordinator?.acceptSuggestion(tag)
+        }
+
         textView.string = text
-        context.coordinator.applyHighlighting()
+        coordinator.applyHighlighting()
         return scrollView
     }
 
@@ -58,6 +79,7 @@ struct HashtagTextEditor: NSViewRepresentable {
             textView.string = text
             textView.selectedRanges = selected
             context.coordinator.applyHighlighting()
+            context.coordinator.updateSuggestions()
         }
 
         if context.coordinator.lastFocusTrigger != focusTrigger {
@@ -74,6 +96,13 @@ struct HashtagTextEditor: NSViewRepresentable {
         weak var textView: GlowingTextView?
         var lastFocusTrigger = Int.min
 
+        private static let tagChars = CharacterSet(
+            charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+        )
+        private static let disallowedBeforeHash = CharacterSet(
+            charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-#"
+        )
+
         init(_ parent: HashtagTextEditor) {
             self.parent = parent
         }
@@ -84,6 +113,11 @@ struct HashtagTextEditor: NSViewRepresentable {
             }
             parent.text = textView.string
             applyHighlighting()
+            updateSuggestions()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            updateSuggestions()
         }
 
         func applyHighlighting() {
@@ -109,13 +143,101 @@ struct HashtagTextEditor: NSViewRepresentable {
             }
             storage.endEditing()
         }
+
+        // MARK: - Suggestions
+
+        /// The `#hashtag` token the caret is currently inside, if any.
+        private struct HashtagContext {
+            let query: String
+            let queryRange: NSRange
+        }
+
+        private func hashtagContext() -> HashtagContext? {
+            guard let textView else {
+                return nil
+            }
+            let selection = textView.selectedRange()
+            guard selection.length == 0 else {
+                return nil
+            }
+
+            let string = textView.string as NSString
+            var start = selection.location
+            while start > 0, isTagCharacter(string.character(at: start - 1)) {
+                start -= 1
+            }
+
+            // Must be immediately preceded by '#'.
+            guard start > 0, string.character(at: start - 1) == hashScalar else {
+                return nil
+            }
+
+            // The '#' itself must not be preceded by a word character.
+            let hashLocation = start - 1
+            if hashLocation > 0,
+               isDisallowedBeforeHash(string.character(at: hashLocation - 1)) {
+                return nil
+            }
+
+            let queryRange = NSRange(location: start, length: selection.location - start)
+            return HashtagContext(query: string.substring(with: queryRange), queryRange: queryRange)
+        }
+
+        func updateSuggestions() {
+            guard let context = hashtagContext() else {
+                if !parent.suggestionModel.items.isEmpty {
+                    parent.suggestionModel.items = []
+                }
+                return
+            }
+            parent.suggestionModel.items = parent.suggestionsProvider(context.query)
+        }
+
+        func acceptSuggestion(_ tag: String) {
+            guard let textView, let context = hashtagContext() else {
+                return
+            }
+
+            if textView.shouldChangeText(in: context.queryRange, replacementString: tag) {
+                textView.replaceCharacters(in: context.queryRange, with: tag)
+                textView.didChangeText()
+            }
+
+            let caret = context.queryRange.location + (tag as NSString).length
+            textView.setSelectedRange(NSRange(location: caret, length: 0))
+            parent.text = textView.string
+            parent.suggestionModel.items = []
+            applyHighlighting()
+            textView.window?.makeFirstResponder(textView)
+        }
+
+        func acceptFirstSuggestion() -> Bool {
+            guard let first = parent.suggestionModel.items.first else {
+                return false
+            }
+            acceptSuggestion(first)
+            return true
+        }
+
+        private var hashScalar: unichar { unichar(UnicodeScalar("#").value) }
+
+        private func isTagCharacter(_ unit: unichar) -> Bool {
+            guard let scalar = Unicode.Scalar(unit) else { return false }
+            return Coordinator.tagChars.contains(scalar)
+        }
+
+        private func isDisallowedBeforeHash(_ unit: unichar) -> Bool {
+            guard let scalar = Unicode.Scalar(unit) else { return false }
+            return Coordinator.disallowedBeforeHash.contains(scalar)
+        }
     }
 }
 
-/// NSTextView that draws a cyan, glowing insertion point and diverts image
-/// pastes to a closure.
+/// NSTextView that draws a cyan, glowing insertion point, diverts image pastes
+/// to a closure, and lets Tab accept the first tag suggestion.
 final class GlowingTextView: NSTextView {
     var onPasteImage: ((Data) -> Void)?
+    var onTabComplete: (() -> Bool)?
 
     // This app has no Edit menu (it runs as a menu-bar accessory), so the
     // standard editing shortcuts aren't delivered via menu key equivalents.
@@ -139,6 +261,16 @@ final class GlowingTextView: NSTextView {
         }
 
         return super.performKeyEquivalent(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        // Tab accepts the first tag suggestion when the chip bar is showing.
+        if event.charactersIgnoringModifiers == "\t",
+           event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+           onTabComplete?() == true {
+            return
+        }
+        super.keyDown(with: event)
     }
 
     override func paste(_ sender: Any?) {

@@ -59,7 +59,7 @@ struct LibraryView: View {
                     ContentUnavailableView(
                         "No Notes",
                         systemImage: "square.and.pencil",
-                        description: Text("Capture a note with Option-N.")
+                        description: Text("Capture a note with Option-Space.")
                     )
                 }
             }
